@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF8"> 
+  <title>NGINX Log Viewer</title>
+  <script type="text/javascript" src="https://rawgithub.com/NickQiZhu/dc.js/master/web/js/crossfilter.js"></script>
+  <script type="text/javascript" src="https://rawgithub.com/NickQiZhu/dc.js/master/web/js/d3.js"></script>
+  <script type="text/javascript" src="https://rawgithub.com/NickQiZhu/dc.js/master/web/js/dc.js"></script>
+  <link type="text/css" rel="stylesheet" href="https://rawgithub.com/NickQiZhu/dc.js/master/web/css/dc.css"/>
+  <style type="text/css">
+    html   { font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; }
+    .stage { max-width: 840px; margin: 0 auto;}
+    header { border-bottom: solid 1px #DDD; margin-bottom: 20px;}
+    .header-title{ font-size: 20px; line-height: 1.6em; }
+    .chart-title { font-size: 16px; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="stage">
+    <h1 class="header-title">Access Log Viewer</h1>
+  </div>
+</header>
+<div id="main" class="stage">
+  <div id="chart-wrapper">
+    <h2 class="chart-title">Number of requests</h2>
+    <div id="req-bar-chart"></div>
+    <h2 class="chart-title">Popular pages</h2>
+    <div id="url-rank-chart"></div>
+    <h2 class="chart-title">Day of the week</h2>
+    <div id="dow-pie-chart"></div>
+  </div>
+</div>
+
+<script type="text/javascript">
+var BASE_SIZE = 210;
+
+d3.csv("data/short.csv", function(data) {
+
+  var reqBarChart = dc.barChart("#req-bar-chart");
+  var urlRowChart = dc.rowChart("#url-rank-chart");
+  var dowPieChart = dc.pieChart("#dow-pie-chart");
+
+  // Remove request to top page  
+  var data = data.filter(function(d){
+    if (d.url != "/" && d.url != "//") {
+      return d;
+    };
+  });
+  var parseDate = d3.time.format("%Y-%m-%d").parse;
+  data.forEach(function(d){
+    d.date = parseDate(d.local_time.split(" ")[0]);
+  });
+
+  var df = crossfilter(data);
+
+  // Bar chart (number of requests)
+  var dateDim = df.dimension(function(d){ return d.date });
+  var reqCount = dateDim.group().reduceCount()
+
+  var minDate = dateDim.bottom(1)[0].date;
+  var maxDate = dateDim.top(1)[0].date;
+
+  reqBarChart
+    .width(BASE_SIZE * 4)
+    .height(BASE_SIZE)
+    .elasticY(true)
+    .x(d3.time.scale().domain([minDate, maxDate]))
+    .dimension(dateDim)
+    .gap(0.1)
+    .xUnits(function(){ return 90; })
+    .group(reqCount);
+
+  // Ranking of popular URL
+  var urlDim = df.dimension(function(d){ return d.url });
+  var urlGroup = urlDim.filterFunction(function(d){ return (d != "/" && d != "//") }).group().reduceCount();
+
+  urlRowChart
+    .width(BASE_SIZE * 4)
+    .height(BASE_SIZE * 1.3)
+    .elasticX(true)
+    .ordering(function(d) { return -d.value; })
+    .dimension(urlDim)
+    .group(urlGroup);
+
+  urlRowChart.data(function (group) { return group.top(10);});
+
+  // Pie Chart (day of the week)
+  var dowDim = df.dimension(function(d) { return d.day_of_week });
+  var dowGroup = dowDim.group().reduceCount();
+  var orderDef = {"Sun":7, "Mon":1, "Tue":2, "Wed":3, "Thu":4, "Fri":5, "Sat":6 };
+
+  dowPieChart
+    .width(BASE_SIZE * 1.2)
+    .height(BASE_SIZE * 0.9)
+    .innerRadius(30)
+    .dimension(dowDim)
+    .group(dowGroup)
+    .ordering(function(d){ return orderDef[d.key] });
+
+  // render all charts
+  dc.renderAll();   
+
+});
+
+</script>
+</body>
