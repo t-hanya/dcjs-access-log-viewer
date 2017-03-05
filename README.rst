@@ -42,7 +42,9 @@ Screen Shot
 .. image:: img/screenshot.png
 
 
-LICENSE
+License
 =======
 
-MIT License
+Copyright(c) 2017 Toshinori Hanya
+Released under the MIT License
+http://opensource.org/licenses/mit-license.php
